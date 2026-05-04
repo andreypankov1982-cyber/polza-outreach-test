@@ -8,6 +8,8 @@ from urllib.request import Request, urlopen
 DEFAULT_INPUT = "polza_companies.csv"
 DEFAULT_OUTPUT = "companies_with_personalization.csv"
 DEFAULT_REPORT = "validation_report.csv"
+EXCEL_OUTPUT = "companies_with_personalization_excel.csv"
+EXCEL_REPORT = "validation_report_excel.csv"
 MIN_ROWS = 50
 
 REQUIRED_COLUMNS = [
@@ -91,7 +93,9 @@ def make_personalization(company: str, niche: str, fact: str) -> str:
 
 def read_companies(input_file: Path) -> tuple[list[dict[str, str]], list[str]]:
     if not input_file.exists():
-        raise FileNotFoundError(f"Не найден файл {input_file}. Положите CSV рядом со скриптом.")
+        raise FileNotFoundError(
+            f"Не найден файл {input_file}. Положите CSV рядом со скриптом."
+        )
 
     with input_file.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
@@ -103,24 +107,38 @@ def read_companies(input_file: Path) -> tuple[list[dict[str, str]], list[str]]:
 
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in fieldnames]
     if missing_columns:
-        raise ValueError("В CSV не хватает обязательных колонок: " + ", ".join(missing_columns))
+        raise ValueError(
+            "В CSV не хватает обязательных колонок: "
+            + ", ".join(missing_columns)
+        )
 
     return rows, fieldnames
 
 
-def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
+def write_csv(
+    path: Path,
+    rows: list[dict[str, str]],
+    fieldnames: list[str],
+    delimiter: str = ",",
+) -> None:
     with path.open("w", encoding="utf-8-sig", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter=delimiter)
         writer.writeheader()
         writer.writerows(rows)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Personalization script for Polza Agency test task")
+    parser = argparse.ArgumentParser(
+        description="Personalization script for Polza Agency test task"
+    )
     parser.add_argument("--input", default=DEFAULT_INPUT)
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--report", default=DEFAULT_REPORT)
-    parser.add_argument("--check-sites", action="store_true", help="Optionally check website availability")
+    parser.add_argument(
+        "--check-sites",
+        action="store_true",
+        help="Optionally check website availability",
+    )
     args = parser.parse_args()
 
     input_file = Path(args.input)
@@ -210,31 +228,38 @@ def main() -> None:
             }
         )
 
+    report_fieldnames = [
+        "row_number",
+        "company",
+        "site",
+        "final_url",
+        "site_ok",
+        "site_status",
+        "email",
+        "email_ok",
+        "personalization_status",
+        "issues",
+    ]
+
     write_csv(output_file, output_rows, fieldnames)
-    write_csv(
-        report_file,
-        report_rows,
-        [
-            "row_number",
-            "company",
-            "site",
-            "final_url",
-            "site_ok",
-            "site_status",
-            "email",
-            "email_ok",
-            "personalization_status",
-            "issues",
-        ],
-    )
+    write_csv(report_file, report_rows, report_fieldnames)
+
+    # Дополнительные версии для Excel с русской локалью.
+    # В них используется разделитель ";", чтобы файл открывался по колонкам двойным кликом.
+    write_csv(Path(EXCEL_OUTPUT), output_rows, fieldnames, delimiter=";")
+    write_csv(Path(EXCEL_REPORT), report_rows, report_fieldnames, delimiter=";")
 
     bad_email_count = sum(row["email_ok"] == "False" for row in report_rows)
     rows_with_issues_count = sum(bool(row["issues"]) for row in report_rows)
     generated_count = sum(row["personalization_status"] == "generated" for row in report_rows)
-    kept_manual_count = sum(row["personalization_status"] == "kept_manual" for row in report_rows)
+    kept_manual_count = sum(
+        row["personalization_status"] == "kept_manual" for row in report_rows
+    )
 
     print(f"Готово: создан файл {output_file}")
     print(f"Готово: создан файл {report_file}")
+    print(f"Готово: создан файл {EXCEL_OUTPUT}")
+    print(f"Готово: создан файл {EXCEL_REPORT}")
     print(f"Строк обработано: {len(output_rows)}")
     print(f"Персонализация сгенерирована: {generated_count}")
     print(f"Ручная персонализация сохранена: {kept_manual_count}")
