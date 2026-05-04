@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 
-INPUT_FILE = Path("companies.csv")
+INPUT_FILE = Path("polza_companies.csv")
 OUTPUT_FILE = Path("companies_with_personalization.csv")
 
 
